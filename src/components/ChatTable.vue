@@ -106,6 +106,21 @@ const scrollToBottom = () => {
         if (msgWrap.value) msgWrap.value.scrollTop = msgWrap.value.scrollHeight
     })
 }
+
+defineExpose({
+    // 切换对话时重置消息
+    switchChat(id) {
+        // 清空当前消息
+        messages.value = [
+            { sender: 'ai', text: `已切换至对话 #${id}，你可以继续聊天~` }
+        ]
+        // 重置发送状态
+        isWaiting.value = false
+        clearTimeout(replyTimer)
+        // 滚动到底部
+        scrollToBottom()
+    }
+})
 </script>
 
 <style scoped>

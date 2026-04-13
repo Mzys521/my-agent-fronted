@@ -39,23 +39,29 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { getHistoryList, saveHistoryList } from '../utils/storage'
 const emit = defineEmits(['switch-chat'])
 
-// 历史对话数据
-const historyList = ref([
-    { id: 1, title: '云南旅行规划', pin: false },
-    { id: 2, title: '5000元预算攻略', pin: false },
-    { id: 3, title: '三亚亲子游', pin: false },
-    { id: 4, title: '新疆自驾游', pin: false },
-])
+// 从本地 temp 存储读取数据（无测试数据）
+const historyList = ref([])
 
-const activeId = ref(1)
+// 激活项
+const activeId = ref(null)
 const openMenuId = ref(null)
 const renameId = ref(null)
 const renameText = ref('')
 
-// 排序规则：置顶项优先 > 最新创建靠前
+// 页面加载时读取本地存储
+onMounted(() => {
+    historyList.value = getHistoryList()
+    // 默认选中第一条
+    if (historyList.value.length) {
+        activeId.value = historyList.value[0].id
+    }
+})
+
+// 排序规则：置顶优先 > 最新创建
 const sortedList = computed(() => {
     return [...historyList.value].sort((a, b) => {
         if (a.pin && !b.pin) return -1
@@ -87,7 +93,7 @@ const rename = (id) => {
     }, 0)
 }
 
-// 确认重命名
+// 确认重命名（自动保存）
 const confirmRename = () => {
     if (!renameId.value || !renameText.value.trim()) {
         renameId.value = null
@@ -96,36 +102,40 @@ const confirmRename = () => {
     const item = historyList.value.find(i => i.id === renameId.value)
     if (item) item.title = renameText.value.trim()
     renameId.value = null
+    saveHistoryList(historyList.value)
 }
 
-// 置顶/取消置顶
+// 置顶/取消置顶（自动保存）
 const togglePin = (id) => {
     const item = historyList.value.find(i => i.id === id)
     if (item) item.pin = !item.pin
     openMenuId.value = null
+    saveHistoryList(historyList.value)
 }
 
-// 删除项目
+// 删除项目（自动保存）
 const deleteItem = (id) => {
-    const index = historyList.value.findIndex(i => i.id === id)
-    if (index > -1) historyList.value.splice(index, 1)
-
+    historyList.value = historyList.value.filter(i => i.id !== id)
     if (activeId.value === id) {
         activeId.value = sortedList.value[0]?.id || null
     }
     openMenuId.value = null
+    saveHistoryList(historyList.value)
 }
 
-// 新建规划
+// 新建规划（自动保存）
 const createNewPlan = () => {
     const newId = Date.now()
-    historyList.value.unshift({
+    const newItem = {
         id: newId,
         title: `新对话 ${historyList.value.length + 1}`,
-        pin: false
-    })
+        pin: false,
+        createTime: new Date().toISOString()
+    }
+    historyList.value.unshift(newItem)
     activeId.value = newId
     emit('switch-chat', newId)
+    saveHistoryList(historyList.value)
 }
 
 // 点击空白关闭菜单
@@ -160,7 +170,6 @@ document.addEventListener('click', () => {
     padding: 12px;
 }
 
-/* 历史条目容器 */
 .history-item {
     position: relative;
     padding: 10px 12px;
@@ -183,7 +192,6 @@ document.addEventListener('click', () => {
     color: #fff;
 }
 
-/* 标题 + 图钉图标 */
 .title-wrap {
     display: flex;
     align-items: center;
@@ -196,7 +204,6 @@ document.addEventListener('click', () => {
     opacity: 0.7;
 }
 
-/* 原地重命名输入框 */
 .rename-input {
     flex: 1;
     padding: 4px 6px;
@@ -207,7 +214,6 @@ document.addEventListener('click', () => {
     background: #fff;
 }
 
-/* 三点操作按钮 */
 .dots {
     opacity: 0;
     font-size: 16px;
@@ -224,7 +230,6 @@ document.addEventListener('click', () => {
     color: #fff;
 }
 
-/* 下拉菜单 */
 .action-menu {
     position: absolute;
     right: 0;
@@ -251,7 +256,6 @@ document.addEventListener('click', () => {
     color: #f43f5e;
 }
 
-/* 底部新增按钮 */
 .history__footer {
     padding: 12px;
     border-top: 1px solid #e5e7eb;
