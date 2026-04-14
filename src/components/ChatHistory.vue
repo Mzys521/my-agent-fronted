@@ -5,19 +5,26 @@
         </div>
 
         <div class="history__list">
-            <div class="history-item" :class="{ active: activeId === item.id }" v-for="item in sortedList" :key="item.id"
-                @click="switchHistory(item.id)">
+            <div class="history-item" :class="{ active: activeId === item.id }" v-for="item in sortedList"
+                :key="item.id" @click="switchHistory(item.id)">
+                <!-- 重命名输入框 -->
                 <input v-if="renameId === item.id" v-model="renameText" class="rename-input" autofocus
-                    @blur="confirmRename" @keyup.enter="confirmRename" />
+                    @blur="confirmRename" @keyup.enter="confirmRename" @click.stop />
+
+                <!-- 正常标题 -->
                 <div class="title-wrap" v-else>
                     <span class="title">{{ item.title }}</span>
                     <span class="pin-icon" v-if="item.pin">📌</span>
                 </div>
+
+                <!-- 更多按钮 -->
                 <div class="dots" @click.stop="openMenu(item.id)">⋮</div>
+
+                <!-- 操作菜单 -->
                 <div class="action-menu" v-if="openMenuId === item.id" @click.stop>
                     <div class="menu-item" @click.stop="rename(item.id)">重命名</div>
                     <div class="menu-item" @click.stop="togglePin(item.id)">
-                        {{ item.pin ? '取消置顶' : '置顶' }}
+                        {{ item.pin ? "取消置顶" : "置顶" }}
                     </div>
                     <div class="menu-item delete" @click.stop="deleteItem(item.id)">删除</div>
                 </div>
@@ -143,45 +150,61 @@ const openMenu = (id) => openMenuId.value = openMenuId.value === id ? null : id
     font-weight: 600;
 }
 
+/* 历史列表区域 */
 .history__list {
     flex: 1;
     overflow-y: auto;
     padding: 12px;
 }
 
+/* 单个历史项 */
 .history-item {
     position: relative;
-    padding: 10px 12px;
-    border-radius: 8px;
-    font-size: 14px;
-    cursor: pointer;
-    margin-bottom: 6px;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
 }
 
+/* 悬浮效果 */
 .history-item:hover {
     background: #e5e7eb;
 }
 
+/* 激活态 */
 .history-item.active {
     background: #2962ff;
     color: #fff;
 }
 
+/* 标题容器：标题 + 置顶图标 */
 .title-wrap {
     display: flex;
     align-items: center;
     gap: 4px;
     flex: 1;
+    min-width: 0;
 }
 
+.title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 置顶图标 */
 .pin-icon {
     font-size: 12px;
     opacity: 0.7;
+    flex-shrink: 0;
 }
 
+/* 重命名输入框 */
 .rename-input {
     flex: 1;
     padding: 4px 6px;
@@ -190,16 +213,28 @@ const openMenu = (id) => openMenuId.value = openMenuId.value === id ? null : id
     outline: none;
     font-size: 14px;
     background: #fff;
+    color: #333;
 }
 
+/* 更多按钮... */
 .dots {
     opacity: 0;
+    font-size: 16px;
+    padding: 0 4px;
+    color: #666;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
 }
 
 .history-item:hover .dots {
     opacity: 1;
 }
 
+.history-item.active .dots {
+    color: #fff;
+}
+
+/* 下拉菜单 */
 .action-menu {
     position: absolute;
     right: 0;
@@ -207,13 +242,19 @@ const openMenu = (id) => openMenuId.value = openMenuId.value === id ? null : id
     width: 120px;
     background: #fff;
     border-radius: 8px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-    z-index: 99;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+    z-index: 999;
+    overflow: hidden;
 }
 
 .menu-item {
     padding: 8px 12px;
     font-size: 13px;
+    color: #333;
+}
+
+.menu-item:hover {
+    background: #f4f4f5;
 }
 
 .menu-item.delete {

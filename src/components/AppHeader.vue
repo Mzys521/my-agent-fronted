@@ -1,7 +1,7 @@
 <template>
     <header class="header">
         <div class="container header-content">
-            <div class="logo">✈️ 旅行智能体</div>
+            <div class="logo"><img src="/face-logo.png" alt="遇川" class="logo-icon" />遇川旅行</div>
             <nav class="nav">
                 <a href="#">首页</a>
                 <a href="#">目的地</a>
@@ -43,6 +43,11 @@
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.logo-icon {
+    width: 70px;
+    height: 70px;
 }
 
 .nav {
