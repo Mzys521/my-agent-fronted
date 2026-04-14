@@ -7,13 +7,28 @@
                 <a href="#">目的地</a>
                 <a href="#">智能规划</a>
                 <a href="#">攻略</a>
-                <a href="#">我的</a>
+                <div v-if="userStore.token" class="user-menu">
+                  <span class="user-name">欢迎, {{ userStore.userInfo?.username }}</span>
+                  <a href="#" @click.prevent="logout">登出</a>
+                </div>
+                <a v-else href="#" @click.prevent="openLogin">登录 / 注册</a>
             </nav>
         </div>
     </header>
 </template>
 
 <script setup>
+import { useUserStore } from '../stores/userStore';
+
+const userStore = useUserStore();
+
+const openLogin = () => {
+  window.dispatchEvent(new CustomEvent('auth-unauthorized'));
+};
+
+const logout = () => {
+  userStore.logout();
+};
 </script>
 
 <style>
@@ -74,5 +89,16 @@
 
 .nav a:hover {
     background: rgba(0, 0, 0, 0.25);
+}
+
+.user-menu {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-name {
+    font-size: 15px;
+    font-weight: 500;
 }
 </style>

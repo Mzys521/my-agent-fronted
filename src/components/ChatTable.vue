@@ -7,16 +7,16 @@
 
         <div class="message-scroll" ref="msgWrap">
             <div class="message-box">
-                <div class="msg-item" :class="item.sender" v-for="(item, idx) in messages" :key="idx">
-                    <template v-if="item.sender === 'ai'">
+                <div class="msg-item" :class="item.role === 'assistant' ? 'ai' : 'user'" v-for="(item, idx) in messages" :key="idx">
+                    <template v-if="item.role === 'assistant'">
                         <div class="avatar ai">🤖</div>
                         <div class="bubble ai">
-                            {{ item.text }}
+                            {{ item.content }}
                             <span v-if="item.loading" class="dot"></span>
                         </div>
                     </template>
-                    <template v-else-if="item.sender === 'user'">
-                        <div class="bubble user">{{ item.text }}</div>
+                    <template v-else-if="item.role === 'user'">
+                        <div class="bubble user">{{ item.content }}</div>
                         <div class="avatar user">👤</div>
                     </template>
                 </div>
@@ -35,8 +35,8 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
-import { getChatMessages, saveChatMessages } from '../utils/storage'
+import { ref, reactive, nextTick } from 'vue'
+import { fetchMessages, sendStreamMessage } from '../api/chat'
 
 const msgWrap = ref(null)
 const inputText = ref('')
@@ -44,7 +44,7 @@ const messages = ref([])
 const currentChatId = ref(null)
 
 const isWaiting = ref(false)
-let replyTimer = null
+let abortController = null
 
 // 从首页进入：自动创建对话并发送消息
 function startFromHome(content) {
@@ -53,11 +53,11 @@ function startFromHome(content) {
 
     currentChatId.value = chatId
     messages.value = [
-        { sender: 'ai', text: '你好，我是你的旅行智能助手～' },
-        { sender: 'user', text: content }
+        { role: 'assistant', content: '你好，我是你的旅行智能助手～' },
+        { role: 'user', content: content }
     ]
 
-    saveChatMessages(chatId, messages.value)
+    scrollToBottom()
     scrollToBottom()
 
     // 通知历史栏创建对话
@@ -65,18 +65,70 @@ function startFromHome(content) {
         window.addChatForUser(chatId, title)
     }
 
-    // AI 自动回复
+// AI 自动回复（模拟入口）改为真实SSE流
     setTimeout(() => {
-        simulateReply('我已收到你的旅行需求，正在为你定制专属行程方案...')
-    }, 800)
+        sendRealMessage(content)
+    }, 500)
+}
+
+// 核心交互：发起真实请求
+const sendRealMessage = async (content) => {
+    isWaiting.value = true;
+    abortController = new AbortController()
+
+    // Add reactive empty placeholder for AI response to ensure stream updates the UI
+    const assistantMessage = reactive({ role: 'assistant', content: '', loading: true })
+    messages.value.push(assistantMessage)
+    scrollToBottom()
+
+    try {
+        await sendStreamMessage(currentChatId.value, content, {
+            signal: abortController.signal,
+            onStart: () => {
+                assistantMessage.loading = false
+            },
+            onDelta: (data) => {
+                if (data && data.content) {
+                    assistantMessage.content += data.content
+                    scrollToBottom()
+                }
+            },
+            onDone: () => {
+                isWaiting.value = false
+                assistantMessage.loading = false
+            },
+            onError: (err) => {
+                if (err.name !== 'AbortError') {
+                    console.error("Stream error", err)
+                    assistantMessage.content += '\n[服务响应异常]'
+                }
+                isWaiting.value = false
+                assistantMessage.loading = false
+            }
+        })
+    } catch(err) {
+        if (err.name !== 'AbortError') {
+             isWaiting.value = false
+             assistantMessage.loading = false
+        }
+    }
 }
 
 // 切换对话
-function switchChat(chatId) {
+async function switchChat(chatId) {
+    if (abortController) stopReply()
+    
     currentChatId.value = chatId
-    messages.value = getChatMessages(chatId)
     isWaiting.value = false
-    clearTimeout(replyTimer)
+    try {
+        const history = await fetchMessages(chatId)
+        // Ensure mapped clearly
+        messages.value = history || []
+    } catch (e) {
+        console.error('Failed to fetch messages', e)
+        messages.value = []
+    }
+    
     scrollToBottom()
 }
 
@@ -84,11 +136,10 @@ function switchChat(chatId) {
 const send = () => {
     const val = inputText.value.trim()
     if (!val || isWaiting.value || !currentChatId.value) return
-    messages.value.push({ sender: 'user', text: val })
+    messages.value.push({ role: 'user', content: val })
     inputText.value = ''
-    saveChatMessages(currentChatId.value, messages.value)
     scrollToBottom()
-    simulateReply('已收到，我会为你继续完善旅行方案～')
+    sendRealMessage(val)
 }
 
 // 模拟回复
@@ -106,11 +157,15 @@ const simulateReply = (text) => {
 
 // 停止回复
 const stopReply = () => {
-    clearTimeout(replyTimer)
-    if (messages.value.at(-1)?.loading) messages.value.pop()
-    messages.value.push({ sender: 'ai', text: '已停止回复' })
+    if (abortController) {
+        abortController.abort()
+        abortController = null
+    }
+    const lastMessage = messages.value.at(-1)
+    if (lastMessage && lastMessage.loading) {
+       lastMessage.loading = false
+    }
     isWaiting.value = false
-    saveChatMessages(currentChatId.value, messages.value)
     scrollToBottom()
 }
 

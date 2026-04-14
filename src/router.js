@@ -16,17 +16,7 @@ const routes = [
       userMessage: route.query.userMessage,
     }),
     meta: { requiresAuth: true },
-  },
-  {
-    path: "/login",
-    name: "Login",
-    component: () => import("./views/LoginView.vue"),
-  },
-  {
-    path: "/register",
-    name: "Register",
-    component: () => import("./views/RegisterView.vue"),
-  },
+  }
 ];
 
 const router = createRouter({
@@ -37,10 +27,11 @@ const router = createRouter({
 // 登录鉴权守卫
 router.beforeEach((to, from, next) => {
   const requiresAuth = to.meta.requiresAuth;
-  const isLogin = localStorage.getItem("userToken");
+  const isLogin = localStorage.getItem("token");
 
   if (requiresAuth && !isLogin) {
-    next("/login");
+    window.dispatchEvent(new CustomEvent('auth-unauthorized'));
+    next(false); // 取消导航
   } else {
     next();
   }

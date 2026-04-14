@@ -14,7 +14,7 @@
                 <!-- 正常标题 -->
                 <div class="title-wrap" v-else>
                     <span class="title">{{ item.title }}</span>
-                    <span class="pin-icon" v-if="item.pin">📌</span>
+                    <span class="pin-icon" v-if="item.pinned">📌</span>
                 </div>
 
                 <!-- 更多按钮 -->
@@ -24,7 +24,7 @@
                 <div class="action-menu" v-if="openMenuId === item.id" @click.stop>
                     <div class="menu-item" @click.stop="rename(item.id)">重命名</div>
                     <div class="menu-item" @click.stop="togglePin(item.id)">
-                        {{ item.pin ? "取消置顶" : "置顶" }}
+                        {{ item.pinned ? "取消置顶" : "置顶" }}
                     </div>
                     <div class="menu-item delete" @click.stop="deleteItem(item.id)">删除</div>
                 </div>
@@ -39,49 +39,58 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getUserChatList, saveUserChatList, deleteChat } from '../utils/storage'
+import { fetchChats, createChat, updateChat, deleteChat } from '../api/chat'
+import { useUserStore } from '../stores/userStore'
 const emit = defineEmits(['switch-chat'])
+const userStore = useUserStore()
 
 const historyList = ref([])
 const activeId = ref(null)
 const openMenuId = ref(null)
 const renameId = ref(null)
 const renameText = ref('')
+const loadChats = async () => {
+    if (!userStore.token) return;
+    try {
+        const res = await fetchChats();
+        historyList.value = res || [];
+        
+        if (historyList.value.length === 0) {
+            createNewPlan(true)
+        } else {
+            activeId.value = historyList.value[0].id
+            emit('switch-chat', activeId.value)
+        }
+    } catch (e) {
+        console.error('Failed to load chats', e)
+    }
+}
 
 onMounted(() => {
-    historyList.value = getUserChatList()
-
-    if (historyList.value.length === 0) {
-        createNewPlan(true)
-    } else {
-        activeId.value = historyList.value[0].id
-        emit('switch-chat', activeId.value)
-    }
+    loadChats();
 
     // 接收从首页创建的对话
-    window.addChatForUser = (chatId, title) => {
+    window.addChatForUser = async (chatId, title) => {
         const exist = historyList.value.some(i => i.id === chatId)
         if (exist) return
 
-        const item = {
-            id: chatId,
-            title: title,
-            pin: false,
-            createTime: new Date().toISOString()
+        try {
+            const res = await createChat({ title, pinned: false })
+            historyList.value.unshift(res)
+            activeId.value = res.id
+            emit('switch-chat', res.id)
+        } catch (e) {
+            console.error('Failed to create route chat', e)
         }
-
-        historyList.value.unshift(item)
-        saveUserChatList(historyList.value)
-        activeId.value = chatId
-        emit('switch-chat', chatId)
     }
 })
 
 const sortedList = computed(() => {
     return [...historyList.value].sort((a, b) => {
-        if (a.pin && !b.pin) return -1
-        if (!a.pin && b.pin) return 1
-        return b.id - a.id
+        // Backend key is pinned
+        if (a.pinned && !b.pinned) return -1
+        if (!a.pinned && b.pinned) return 1
+        return new Date(b.created_at) - new Date(a.created_at)
     })
 })
 
@@ -96,36 +105,56 @@ const rename = (id) => {
     renameText.value = historyList.value.find(i => i.id === id)?.title || ''
 }
 
-const confirmRename = () => {
+const confirmRename = async () => {
     const item = historyList.value.find(i => i.id === renameId.value)
-    if (item) item.title = renameText.value.trim()
-    renameId.value = null
-    saveUserChatList(historyList.value)
-}
-
-const togglePin = (id) => {
-    const item = historyList.value.find(i => i.id === id)
-    if (item) item.pin = !item.pin
-    saveUserChatList(historyList.value)
-}
-
-const deleteItem = (id) => {
-    deleteChat(id)
-    historyList.value = getUserChatList()
-    activeId.value = historyList.value[0]?.id || null
-}
-
-function createNewPlan(isDefault = false) {
-    const newId = Date.now()
-    const item = {
-        id: newId,
-        title: isDefault ? '默认对话' : `新对话 ${historyList.value.length + 1}`,
-        pin: false
+    if (item) {
+        const newTitle = renameText.value.trim()
+        try {
+            await updateChat(item.id, { title: newTitle })
+            item.title = newTitle
+        } catch (e) {
+            console.error('Rename failed', e)
+        }
     }
-    historyList.value.unshift(item)
-    activeId.value = newId
-    emit('switch-chat', newId)
-    saveUserChatList(historyList.value)
+    renameId.value = null
+}
+
+const togglePin = async (id) => {
+    const item = historyList.value.find(i => i.id === id)
+    if (item) {
+        try {
+            await updateChat(item.id, { pinned: !item.pinned })
+            item.pinned = !item.pinned
+        } catch (e) {
+            console.error('Toggle pin failed', e)
+        }
+    }
+}
+
+const deleteItem = async (id) => {
+    try {
+        await deleteChat(id)
+        historyList.value = historyList.value.filter(i => i.id !== id)
+        if (activeId.value === id) {
+            activeId.value = historyList.value[0]?.id || null
+            if (activeId.value) emit('switch-chat', activeId.value)
+        }
+    } catch (e) {
+        console.error('Delete chat failed', e)
+    }
+}
+
+async function createNewPlan(isDefault = false) {
+    try {
+        const title = isDefault ? '默认对话' : `新对话 ${historyList.value.length + 1}`
+        const res = await createChat({ title, pinned: false })
+        
+        historyList.value.unshift(res)
+        activeId.value = res.id
+        emit('switch-chat', res.id)
+    } catch (e) {
+        console.error('Failed to create new plan', e)
+    }
 }
 
 const openMenu = (id) => openMenuId.value = openMenuId.value === id ? null : id
