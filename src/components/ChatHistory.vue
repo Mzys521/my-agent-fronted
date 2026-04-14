@@ -41,6 +41,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { fetchChats, createChat, updateChat, deleteChat } from '../api/chat'
 import { useUserStore } from '../stores/userStore'
+const props = defineProps({
+    initialMessage: { type: String, default: '' }
+})
 const emit = defineEmits(['switch-chat'])
 const userStore = useUserStore()
 
@@ -55,6 +58,12 @@ const loadChats = async () => {
         const res = await fetchChats();
         historyList.value = res || [];
         
+        if (props.initialMessage && props.initialMessage.trim()) {
+            const title = props.initialMessage.slice(0, 10);
+            await createNewPlan(false, title, props.initialMessage.trim());
+            return;
+        }
+
         if (historyList.value.length === 0) {
             createNewPlan(true)
         } else {
@@ -68,21 +77,6 @@ const loadChats = async () => {
 
 onMounted(() => {
     loadChats();
-
-    // 接收从首页创建的对话
-    window.addChatForUser = async (chatId, title) => {
-        const exist = historyList.value.some(i => i.id === chatId)
-        if (exist) return
-
-        try {
-            const res = await createChat({ title, pinned: false })
-            historyList.value.unshift(res)
-            activeId.value = res.id
-            emit('switch-chat', res.id)
-        } catch (e) {
-            console.error('Failed to create route chat', e)
-        }
-    }
 })
 
 const sortedList = computed(() => {
@@ -144,14 +138,14 @@ const deleteItem = async (id) => {
     }
 }
 
-async function createNewPlan(isDefault = false) {
+async function createNewPlan(isDefault = false, customTitle = null, triggerContent = null) {
     try {
-        const title = isDefault ? '默认对话' : `新对话 ${historyList.value.length + 1}`
+        const title = customTitle || (isDefault ? '默认对话' : `新对话 ${historyList.value.length + 1}`)
         const res = await createChat({ title, pinned: false })
         
         historyList.value.unshift(res)
         activeId.value = res.id
-        emit('switch-chat', res.id)
+        emit('switch-chat', res.id, triggerContent)
     } catch (e) {
         console.error('Failed to create new plan', e)
     }
@@ -165,25 +159,31 @@ const openMenu = (id) => openMenuId.value = openMenuId.value === id ? null : id
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: #f9fafb;
+    background: transparent;
 }
 
 .history__header {
-    padding: 18px 16px;
-    border-bottom: 1px solid #e5e7eb;
+    padding: 24px 20px 16px;
+    /* Soft border or none for modern look */
 }
 
 .history__header h3 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted, #94a3b8);
+    letter-spacing: 0.05em;
 }
 
 /* 历史列表区域 */
 .history__list {
     flex: 1;
     overflow-y: auto;
-    padding: 12px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 /* 单个历史项 */
@@ -192,30 +192,36 @@ const openMenu = (id) => openMenuId.value = openMenuId.value === id ? null : id
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 12px;
-    margin-bottom: 6px;
-    border-radius: 8px;
+    padding: 12px 14px;
+    border-radius: 12px;
     font-size: 14px;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    color: var(--text-secondary, #475569);
+    font-weight: 500;
 }
 
 /* 悬浮效果 */
 .history-item:hover {
-    background: #e5e7eb;
+    background: var(--bg-secondary, #ffffff);
+    box-shadow: var(--shadow-sm);
+    color: var(--text-primary, #0f172a);
 }
 
 /* 激活态 */
 .history-item.active {
-    background: #2962ff;
-    color: #fff;
+    background: var(--bg-secondary, #ffffff);
+    border-color: var(--border-color, #e2e8f0);
+    box-shadow: var(--shadow-sm);
+    color: var(--accent-primary, #2563eb);
 }
 
 /* 标题容器：标题 + 置顶图标 */
 .title-wrap {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
     flex: 1;
     min-width: 0;
 }
@@ -236,23 +242,33 @@ const openMenu = (id) => openMenuId.value = openMenuId.value === id ? null : id
 /* 重命名输入框 */
 .rename-input {
     flex: 1;
-    padding: 4px 6px;
-    border: 1px solid #2962ff;
-    border-radius: 4px;
+    padding: 6px 10px;
+    border: 1px solid var(--accent-light, #e0e7ff);
+    border-radius: 6px;
     outline: none;
     font-size: 14px;
-    background: #fff;
-    color: #333;
+    background: var(--bg-secondary, #ffffff);
+    color: var(--text-primary, #0f172a);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
 /* 更多按钮... */
 .dots {
     opacity: 0;
-    font-size: 16px;
-    padding: 0 4px;
-    color: #666;
-    transition: opacity 0.2s;
+    font-size: 18px;
+    padding: 0 6px;
+    color: var(--text-muted, #94a3b8);
+    transition: all 0.2s;
     flex-shrink: 0;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dots:hover {
+    background: var(--bg-muted, #f1f5f9);
+    color: var(--text-primary, #0f172a);
 }
 
 .history-item:hover .dots {
@@ -260,48 +276,76 @@ const openMenu = (id) => openMenuId.value = openMenuId.value === id ? null : id
 }
 
 .history-item.active .dots {
-    color: #fff;
+    opacity: 1;
 }
 
 /* 下拉菜单 */
 .action-menu {
     position: absolute;
-    right: 0;
-    top: 100%;
-    width: 120px;
+    right: 12px;
+    top: calc(100% - 10px);
+    width: 140px;
     background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
     z-index: 999;
     overflow: hidden;
+    border: 1px solid var(--border-color, #e2e8f0);
+    padding: 4px;
 }
 
 .menu-item {
-    padding: 8px 12px;
+    padding: 10px 12px;
     font-size: 13px;
-    color: #333;
+    color: var(--text-secondary, #475569);
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease;
 }
 
 .menu-item:hover {
-    background: #f4f4f5;
+    background: var(--bg-muted, #f1f5f9);
+    color: var(--text-primary, #0f172a);
 }
 
 .menu-item.delete {
-    color: #f43f5e;
+    color: #ef4444;
+}
+
+.menu-item.delete:hover {
+    background: #fef2f2;
 }
 
 .history__footer {
-    padding: 12px;
-    border-top: 1px solid #e5e7eb;
+    padding: 20px;
+    background: linear-gradient(to top, var(--bg-primary, #f8fafc) 60%, transparent);
 }
 
 .new-btn {
     width: 100%;
-    padding: 10px 0;
-    border-radius: 8px;
+    padding: 12px 0;
+    border-radius: 12px;
     border: none;
-    background: #2962ff;
+    background: linear-gradient(135deg, var(--accent-primary, #2563eb), var(--accent-hover, #1d4ed8));
     color: #fff;
+    font-weight: 600;
+    font-size: 14px;
     cursor: pointer;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.new-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+}
+
+.new-btn:active {
+    transform: translateY(0);
 }
 </style>

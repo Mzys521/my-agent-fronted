@@ -1,8 +1,13 @@
 <template>
   <div v-if="visible" class="auth-modal-overlay">
-    <div class="auth-modal">
+    <div class="auth-modal" @click.stop>
       <button class="close-btn" @click="close">&times;</button>
       
+      <div class="auth-header">
+        <div class="logo">遇川旅行</div>
+        <p class="subtitle">{{ mode === 'login' ? '欢迎回来，继续您的探索' : '加入我们，开启智能旅行' }}</p>
+      </div>
+
       <div class="auth-tabs">
         <button 
           :class="{ active: mode === 'login' }" 
@@ -41,7 +46,7 @@
         <div v-if="errorMessage" class="error-msg">{{ errorMessage }}</div>
 
         <button type="submit" class="submit-btn" :disabled="loading">
-          {{ loading ? '处理中...' : (mode === 'login' ? '登录' : '注册') }}
+          {{ loading ? '处理中...' : (mode === 'login' ? '立即登录' : '注册账号') }}
         </button>
       </form>
     </div>
@@ -126,114 +131,164 @@ defineExpose({
 <style scoped>
 .auth-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(8px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  backdrop-filter: blur(4px);
+  padding: 20px;
 }
 
 .auth-modal {
-  background: white;
-  width: 400px;
-  border-radius: 12px;
-  padding: 30px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  background: rgba(255, 255, 255, 0.95);
+  width: 100%;
+  max-width: 420px;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  animation: slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .close-btn {
   position: absolute;
-  top: 15px;
-  right: 15px;
+  top: 20px;
+  right: 20px;
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 28px;
+  line-height: 1;
   cursor: pointer;
-  color: #888;
+  color: var(--text-muted, #94a3b8);
+  transition: color 0.2s;
+  padding: 4px;
 }
 
 .close-btn:hover {
-  color: #333;
+  color: var(--text-primary, #0f172a);
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--accent-primary, #2563eb);
+  margin-bottom: 8px;
+  letter-spacing: 0.05em;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-secondary, #475569);
+  margin: 0;
 }
 
 .auth-tabs {
   display: flex;
-  margin-bottom: 25px;
-  border-bottom: 2px solid #eee;
+  margin-bottom: 28px;
+  background: var(--bg-muted, #f1f5f9);
+  padding: 4px;
+  border-radius: 12px;
 }
 
 .auth-tabs button {
   flex: 1;
-  background: none;
+  background: transparent;
   border: none;
   padding: 10px 0;
-  font-size: 16px;
-  font-weight: bold;
-  color: #888;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
   cursor: pointer;
-  box-shadow: none;
+  border-radius: 8px;
+  transition: all 0.2s ease;
 }
 
 .auth-tabs button.active {
-  color: #007bff;
-  border-bottom: 2px solid #007bff;
+  color: var(--accent-primary, #2563eb);
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 18px;
 }
 
 .form-group label {
   display: block;
   font-size: 14px;
+  font-weight: 500;
   margin-bottom: 8px;
-  color: #333;
+  color: var(--text-primary, #0f172a);
 }
 
 .form-group input {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  padding: 12px 16px;
+  background: var(--bg-primary, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 10px;
   font-size: 15px;
   box-sizing: border-box;
+  transition: all 0.2s ease;
+  color: var(--text-primary, #0f172a);
+}
+
+.form-group input::placeholder {
+  color: var(--text-muted, #94a3b8);
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #007bff;
+  border-color: var(--accent-primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background: #ffffff;
 }
 
 .error-msg {
-  color: #dc3545;
+  color: #ef4444;
   font-size: 14px;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
+  padding: 10px;
+  background: #fef2f2;
+  border-radius: 8px;
+  text-align: center;
 }
 
 .submit-btn {
   width: 100%;
-  padding: 12px;
-  background: #007bff;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--accent-primary, #2563eb), var(--accent-hover, #1d4ed8));
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 10px;
   font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
-.submit-btn:hover {
-  background: #0056b3;
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
 }
 
 .submit-btn:disabled {
-  background: #a0cfff;
+  background: #94a3b8;
   cursor: not-allowed;
+  box-shadow: none;
 }
 </style>
