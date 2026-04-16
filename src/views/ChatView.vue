@@ -1,7 +1,7 @@
 <template>
     <ChatLayout>
         <template #left>
-            <ChatHistory @switch-chat="handleSwitchChat" />
+            <ChatHistory :initialMessage="userMessage" @switch-chat="handleSwitchChat" />
         </template>
 
         <template #right>
@@ -14,28 +14,24 @@
 import ChatLayout from '../layout/ChatLayout.vue'
 import ChatHistory from '../components/ChatHistory.vue'
 import ChatTable from '../components/ChatTable.vue'
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const chatRef = ref(null)
 const route = useRoute()
+const router = useRouter()
 
-onMounted(() => {
-    // 读取首页传过来的内容
-    const content = route.query.userMessage
-    if (content && content.trim()) {
-        setTimeout(() => {
-            // 自动创建对话 + 发消息
-            if (chatRef.value) {
-                chatRef.value.startFromHome(content)
-            }
-        }, 300)
-    }
-})
+const userMessage = route.query.userMessage || ''
 
-const handleSwitchChat = (id) => {
+const handleSwitchChat = (id, triggerContent) => {
     if (chatRef.value) {
-        chatRef.value.switchChat(id)
+        chatRef.value.switchChat(id).then(() => {
+            if (triggerContent) {
+                // Replace route to clear the query
+                router.replace({ path: '/chat' })
+                chatRef.value.sendDirectly(triggerContent)
+            }
+        })
     }
 }
 </script>
