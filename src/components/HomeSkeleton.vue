@@ -6,13 +6,40 @@
                 您的浏览器不支持视频播放。
             </video>
             <div class="video-overlay">
-                <h1>探索世界，智能随行</h1>
-                <p>AI一键规划行程，覆盖全球目的地，让旅行更简单、更自由</p>
-                <div class="search-box" :class="{ 'error': isInputError }">
-                    <input v-model="searchKey" type="text" placeholder="输入目的地/景点/关键词" class="search-input"
-                        @input="isInputError = false" />
-                    <button class="search-btn" @click="doSearch">搜索</button>
+                <div class="hero-particles" aria-hidden="true">
+                    <span
+                        v-for="particle in heroParticles"
+                        :key="particle.id"
+                        class="particle"
+                        :style="particle.style"
+                    />
                 </div>
+
+                <h1>探索世界，智能随行</h1>
+                <p>AI 一键规划行程，覆盖全球目的地，让旅行更简单、更自由</p>
+
+                <div
+                    ref="searchShellRef"
+                    class="search-shell"
+                    :style="searchShellStyle"
+                    @mousemove="handleSearchPointerMove"
+                    @mouseleave="resetSearchPointer"
+                >
+                    <div class="search-box" :class="{ error: isInputError }">
+                        <div class="search-input-wrap">
+                            <input
+                                v-model="searchKey"
+                                type="text"
+                                placeholder="输入目的地/景点/关键词"
+                                class="search-input"
+                                @input="isInputError = false"
+                            />
+                        </div>
+                        <button class="search-btn" @click="doSearch">搜索</button>
+                    </div>
+                </div>
+
+                <button class="history-entry-btn" @click="goToHistory">进入历史会话</button>
             </div>
         </section>
 
@@ -29,15 +56,17 @@
 
         <section class="destination-section">
             <div class="container">
-                <h2 class="section-title">本周热门目的地</h2>
+                <h2 class="section-title">本周热门景点 TOP3</h2>
                 <div class="destination-grid">
-                    <div class="destination-card" v-for="(item, index) in destinations" :key="index">
-                        <img class="card-img" :src="item.image" :alt="item.title" />
+                    <div class="destination-card" v-for="item in destinations" :key="item.id">
+                        <div class="card-media">
+                            <img class="card-img" :src="item.image" :alt="item.name" />
+                        </div>
                         <div class="card-info">
-                            <span class="badge">{{ item.type }}</span>
-                            <h3 class="card-title">{{ item.title }}</h3>
-                            <p class="card-desc">{{ item.subtitle }}</p>
-                            <div class="card-price">{{ item.price }}</div>
+                            <span class="badge">{{ item.styleTag }}</span>
+                            <h3 class="card-title">{{ item.name }}</h3>
+                            <p class="card-location">{{ item.location }}</p>
+                            <p class="card-desc">{{ item.intro }}</p>
                         </div>
                     </div>
                 </div>
@@ -60,13 +89,40 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { fetchWeeklyHotSpots } from '../api/hotSpots'
 
-// const bgvideo = ref("../assets/bg-video-trim.mp4")
 const router = useRouter()
 const searchKey = ref('')
 const isInputError = ref(false)
+
+const searchShellRef = ref(null)
+const rotateX = ref(0)
+const rotateY = ref(0)
+const searchShellStyle = computed(() => ({
+    transform: `perspective(1200px) rotateX(${rotateX.value}deg) rotateY(${rotateY.value}deg)`,
+}))
+
+const heroParticles = Array.from({ length: 16 }, (_, index) => {
+    const left = (index * 7 + 5) % 100
+    const top = (index * 11 + 9) % 100
+    const delay = `${(index % 6) * 0.7}s`
+    const duration = `${8 + (index % 5) * 1.7}s`
+    const size = 4 + (index % 4) * 2
+    return {
+        id: `particle-${index}`,
+        style: {
+            left: `${left}%`,
+            top: `${top}%`,
+            width: `${size}px`,
+            height: `${size}px`,
+            animationDelay: delay,
+            animationDuration: duration,
+        },
+    }
+})
+
 const categoryTags = ref([
     '自然风光',
     '人文历史',
@@ -78,61 +134,84 @@ const categoryTags = ref([
     '探险徒步',
 ])
 
-const destinations = ref([
+const defaultDestinations = [
     {
-        title: '巴厘岛·热带海岛',
-        subtitle: '阳光海岸、温柔沙滩与浪漫双人夜。',
-        type: '海岛度假',
-        price: '4300 3天2晚起',
-        image: 'https://images.unsplash.com/photo-1493558103817-58b2924bce98?auto=format&fit=crop&w=1200&q=80',
+        id: 'west-lake',
+        name: '西湖',
+        location: '浙江·杭州',
+        styleTag: '湖山诗意',
+        intro: '三面云山一面城，晨昏光影和湖岸慢行都很治愈。',
+        image: 'https://picsum.photos/seed/west-lake/1200/900',
     },
     {
-        title: '京都·古都巡礼',
-        subtitle: '千年寺庙、枫叶与和风美学相遇。',
-        type: '人文历史',
-        price: '5800 4天3晚起',
-        image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=1200&q=80',
+        id: 'gulangyu',
+        name: '鼓浪屿',
+        location: '福建·厦门',
+        styleTag: '海岛人文',
+        intro: '红瓦老别墅与海风并行，适合边走边拍的文艺小岛。',
+        image: 'https://picsum.photos/seed/gulangyu/1200/900',
     },
     {
-        title: '瑞士·雪山秘境',
-        subtitle: '高山湖泊、纯净空气与冬季户外体验。',
-        type: '雪山冰川',
-        price: '6900 5天4晚起',
-        image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80',
+        id: 'jiuzhaigou',
+        name: '九寨沟',
+        location: '四川·阿坝州',
+        styleTag: '高原秘境',
+        intro: '层林彩池与瀑布群交错，色彩层次在晴天尤为惊艳。',
+        image: 'https://picsum.photos/seed/jiuzhaigou/1200/900',
     },
-])
+]
+const destinations = ref([...defaultDestinations])
 
 const advantages = ref([
     {
-        icon: '🧭',
+        icon: 'AI',
         title: '智能规划',
-        description: 'AI根据偏好生成最优行程，减少预算和时间浪费。',
+        description: 'AI 根据偏好生成更契合的路线，减少预算和时间浪费。',
     },
     {
-        icon: '⚡',
+        icon: '快',
         title: '极速出发',
-        description: '推荐热门路线与时令玩法，让旅行决策更快速。',
+        description: '推荐热门路线与时令玩法，让旅行决策更高效。',
     },
     {
-        icon: '☁️',
+        icon: '云',
         title: '云端同步',
         description: '行程、门票、酒店信息一键同步，随时查看更安心。',
     },
 ])
 
+const normalizeImage = (image) => {
+    if (!image || typeof image !== 'string') return ''
+    if (image.startsWith('/')) return image
+    return image
+}
+
+const handleSearchPointerMove = (event) => {
+    const shell = searchShellRef.value
+    if (!shell) return
+    const rect = shell.getBoundingClientRect()
+    const x = ((event.clientX - rect.left) / rect.width - 0.5) * 2
+    const y = ((event.clientY - rect.top) / rect.height - 0.5) * 2
+    rotateY.value = Number((x * 3.2).toFixed(2))
+    rotateX.value = Number((-y * 2.6).toFixed(2))
+}
+
+const resetSearchPointer = () => {
+    rotateX.value = 0
+    rotateY.value = 0
+}
+
 const doSearch = () => {
     const value = searchKey.value.trim()
     if (!value) {
         isInputError.value = true
-        alert('请输入搜索内容')
+        window.alert('请输入搜索内容')
         return
     }
 
     router.push({
         path: '/chat',
-        query: {
-            userMessage: value
-        }
+        query: { userMessage: value },
     })
 }
 
@@ -140,25 +219,41 @@ const selectTag = (tag) => {
     searchKey.value = tag
     doSearch()
 }
+
+const goToHistory = () => {
+    router.push({ path: '/chat' })
+}
+
+const loadWeeklyHotSpots = async () => {
+    try {
+        const response = await fetchWeeklyHotSpots(3)
+        const items = response?.items
+        if (Array.isArray(items) && items.length > 0) {
+            destinations.value = items.slice(0, 3).map((item) => ({
+                id: item.id,
+                name: item.name,
+                location: item.location,
+                styleTag: item.styleTag,
+                intro: item.intro,
+                image: normalizeImage(item.image),
+            }))
+        }
+    } catch (error) {
+        console.warn('Failed to load weekly hot spots, using fallback data.', error)
+        destinations.value = [...defaultDestinations]
+    }
+}
+
+onMounted(() => {
+    loadWeeklyHotSpots()
+})
 </script>
 
 <style>
 :root {
     --page-bg: #edf4fb;
-    --surface: #ffffff;
-    --surface-soft: #f7fbff;
     --text: #1a2438;
-    --text-secondary: #58637a;
-    --accent: #42b983;
-    --accent-strong: #2f805f;
-    --border: rgba(42, 105, 154, 0.12);
-    --shadow: 0 24px 70px rgba(13, 27, 56, 0.08);
-    --radius: 30px;
-    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
-    font-size: 16px;
-    line-height: 1.75;
-    color: var(--text);
-    background: var(--page-bg);
+    --accent: #1ca27a;
 }
 
 * {
@@ -167,26 +262,12 @@ const selectTag = (tag) => {
     box-sizing: border-box;
 }
 
-body {
-    min-height: 100vh;
-    /* background: linear-gradient(180deg, #eff5fb 0%, #f8fbff 100%); */
-    color: var(--text);
-}
-
-h1,
-h2,
-h3,
-p,
-button,
-input {
-    margin: 0;
-}
-
 .home-page {
     min-height: calc(100vh - 120px);
     color: var(--text);
     overflow-x: hidden;
     padding-bottom: 24px;
+    font-family: "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
 }
 
 .container {
@@ -210,15 +291,15 @@ input {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    z-index: -1;
-    filter: brightness(0.6) saturate(1.05);
+    z-index: -2;
+    filter: brightness(0.56) saturate(1.08);
 }
 
 .video-overlay {
+    position: relative;
     width: 100%;
     height: 100%;
-    background: rgba(8, 31, 66, 0.24);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 32px;
     padding: 100px 32px 60px;
     display: flex;
@@ -226,531 +307,380 @@ input {
     align-items: center;
     justify-content: center;
     text-align: center;
-    gap: 22px;
-    position: relative;
-    box-shadow: 0 30px 80px rgba(15, 37, 76, 0.18);
-}
-
-.video-overlay::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.08), transparent 50%);
-    pointer-events: none;
-    border-radius: inherit;
+    gap: 20px;
+    box-shadow: 0 30px 80px rgba(15, 37, 76, 0.2);
+    background:
+        radial-gradient(circle at 20% 10%, rgba(62, 189, 224, 0.18), transparent 35%),
+        radial-gradient(circle at 80% 90%, rgba(47, 158, 125, 0.18), transparent 40%),
+        rgba(8, 31, 66, 0.26);
+    overflow: hidden;
 }
 
 .video-overlay h1 {
     font-size: clamp(3rem, 5vw, 4.4rem);
     line-height: 1.02;
-    font-weight: 800;
-    letter-spacing: -0.05em;
-    text-shadow: 0 22px 90px rgba(0, 0, 0, 0.32);
+    font-weight: 900;
+    letter-spacing: -0.04em;
     color: #fff;
+    text-shadow: 0 8px 32px rgba(6, 22, 45, 0.28);
 }
 
 .video-overlay p {
-    font-size: 1.05rem;
-    max-width: 720px;
+    font-size: 1.08rem;
+    max-width: 780px;
     color: rgba(255, 255, 255, 0.92);
     line-height: 1.8;
 }
 
-.search-box {
-    display: flex;
-    width: 600px;
-    max-width: 90%;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 50px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    overflow: hidden;
+.hero-particles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.particle {
+    position: absolute;
+    border-radius: 999px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(101, 246, 223, 0.65));
+    box-shadow: 0 0 16px rgba(120, 242, 229, 0.45);
+    animation: particleFloat 10s ease-in-out infinite;
+    opacity: 0.55;
+}
+
+@keyframes particleFloat {
+    0% {
+        transform: translate3d(0, 0, 0) scale(0.8);
+        opacity: 0.3;
+    }
+    50% {
+        transform: translate3d(12px, -18px, 0) scale(1.15);
+        opacity: 0.88;
+    }
+    100% {
+        transform: translate3d(-10px, -36px, 0) scale(0.78);
+        opacity: 0.2;
+    }
+}
+
+.search-shell {
+    width: min(720px, 92%);
     position: relative;
-    z-index: 1;
-    animation: fadeInUp 1s ease-out 0.4s both;
+    z-index: 2;
+    transition: transform 0.2s ease;
+}
+
+.search-box {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(245, 252, 255, 0.92));
+    box-shadow:
+        0 12px 35px rgba(5, 24, 52, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .search-box.error {
-    border-color: #ef4444;
-    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3);
+    border-color: rgba(248, 113, 113, 0.9);
+    box-shadow:
+        0 12px 35px rgba(5, 24, 52, 0.28),
+        0 0 0 4px rgba(248, 113, 113, 0.24);
+}
+
+.search-shell:hover .search-box,
+.search-shell:focus-within .search-box {
+    border-color: rgba(81, 221, 186, 0.9);
+    box-shadow:
+        0 14px 40px rgba(5, 24, 52, 0.3),
+        0 0 0 4px rgba(70, 201, 165, 0.24);
+}
+
+.search-input-wrap {
+    min-width: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    padding: 0 6px;
 }
 
 .search-input {
-    flex: 1;
-    padding: 18px 24px;
+    width: 100%;
     border: none;
-    border-radius: 50px 0 0 50px;
-    font-size: 16px;
-    outline: none;
     background: transparent;
-    color: #333;
+    outline: none;
+    padding: 16px 20px;
+    font-size: 17px;
+    color: #1f2f45;
 }
 
 .search-input::placeholder {
-    color: #999;
-    font-weight: 400;
-}
-
-.search-input:focus {
-    background: rgba(255, 255, 255, 0.98);
+    color: #8ba0b6;
 }
 
 .search-btn {
-    padding: 18px 32px;
-    background: linear-gradient(135deg, #42b983, #359469);
-    color: #fff;
     border: none;
-    border-radius: 0 50px 50px 0;
+    border-radius: 999px;
+    min-width: 120px;
+    padding: 15px 30px;
+    background: linear-gradient(135deg, #16a979, #0d8f68);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
     cursor: pointer;
-    transition: background 0.3s ease, box-shadow 0.3s ease;
-    font-weight: 600;
-    font-size: 16px;
+    box-shadow: 0 8px 20px rgba(20, 142, 104, 0.38);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
 }
 
 .search-btn:hover {
-    background: linear-gradient(135deg, #359469, #2a7d4a);
-    box-shadow: 0 6px 20px rgba(66, 185, 131, 0.4);
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 12px 24px rgba(20, 142, 104, 0.42);
+    filter: saturate(1.06);
 }
 
-.category-section {
-    padding: 60px 0;
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    margin: 30px 0;
-    border-radius: 20px;
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
-    position: relative;
-    overflow: hidden;
+.search-btn:active {
+    transform: translateY(0);
 }
 
-.category-section::before {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #42b983, #667eea, #764ba2);
+.history-entry-btn {
+    margin-top: 6px;
+    padding: 12px 24px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.42);
+    background: rgba(10, 28, 56, 0.34);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    z-index: 2;
+    transition: all 0.2s ease;
+}
+
+.history-entry-btn:hover {
+    background: rgba(14, 39, 74, 0.56);
+    border-color: rgba(159, 248, 235, 0.7);
+}
+
+.category-section,
+.destination-section,
+.advantage-section {
+    padding: 70px 0;
 }
 
 .section-title {
     text-align: center;
-    font-size: 36px;
+    font-size: 34px;
     color: #1a202c;
-    margin-bottom: 40px;
+    margin-bottom: 36px;
     font-weight: 700;
-    position: relative;
-}
-
-.section-title::after {
-    position: absolute;
-    bottom: -10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60px;
-    height: 4px;
-    background: linear-gradient(135deg, #42b983, #667eea);
-    border-radius: 2px;
 }
 
 .category-tags {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 16px;
-    max-width: 1200px;
-    margin: 0 auto;
+    gap: 14px;
 }
 
 .tag {
-    padding: 12px 24px;
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-    border: 2px solid #e2e8f0;
-    border-radius: 50px;
+    padding: 10px 18px;
+    border: 1px solid #d5e2ee;
+    border-radius: 999px;
+    background: #fff;
     color: #4a5568;
-    font-size: 15px;
-    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.tag::before {
-
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(66, 185, 131, 0.1), transparent);
-    transition: left 0.5s;
-}
-
-.tag:hover::before {
-    left: 100%;
+    transition: 0.2s ease;
 }
 
 .tag:hover {
-    background: linear-gradient(135deg, #42b983, #359469);
+    background: #42b983;
     color: #fff;
-    border-color: #42b983;
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(66, 185, 131, 0.3);
-}
-
-.destination-section {
-    padding: 80px 0;
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
 }
 
 .destination-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 32px;
-    margin-top: 50px;
-    max-width: 1400px;
-    margin-left: auto;
-    margin-right: auto;
+    gap: 28px;
 }
 
 .destination-card {
+    position: relative;
     background: #fff;
     border-radius: 20px;
     overflow: hidden;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-    transition: all 0.4s ease;
-    position: relative;
-    border: 1px solid rgba(255, 255, 255, 0.8);
+    transition: transform 0.35s ease, box-shadow 0.35s ease;
+    transform-style: preserve-3d;
 }
 
-.destination-card::before {
+.destination-card::after {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #42b983, #667eea);
-    transform: scaleX(0);
-    transition: transform 0.3s ease;
-}
-
-.destination-card:hover::before {
-    transform: scaleX(1);
+    inset: -120% 35% auto -45%;
+    height: 220%;
+    background: linear-gradient(
+        115deg,
+        rgba(255, 255, 255, 0) 12%,
+        rgba(255, 255, 255, 0.32) 45%,
+        rgba(255, 255, 255, 0) 78%
+    );
+    transform: translateX(-130%) rotate(8deg);
+    transition: transform 0.55s ease;
+    pointer-events: none;
 }
 
 .destination-card:hover {
-    transform: translateY(-12px) scale(1.02);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    transform: translateY(-10px);
+    box-shadow: 0 22px 42px rgba(14, 44, 86, 0.18);
+}
+
+.destination-card:hover::after {
+    transform: translateX(165%) rotate(8deg);
+}
+
+.card-media {
+    position: relative;
+    overflow: hidden;
+    height: 236px;
+    background: linear-gradient(140deg, #dce6f4, #f4f8ff);
+}
+
+.card-media::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 16% 20%, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0));
+    pointer-events: none;
+    z-index: 1;
 }
 
 .card-img {
     width: 100%;
-    height: 220px;
+    height: 100%;
     object-fit: cover;
-    transition: transform 0.4s ease;
+    object-position: center 44%;
+    transform: scale(1.1);
+    transition: transform 0.45s ease;
+    will-change: transform;
 }
 
 .destination-card:hover .card-img {
-    transform: scale(1.1);
+    transform: scale(1.17);
 }
 
 .card-info {
-    padding: 28px;
-    position: relative;
+    padding: 24px;
 }
 
 .badge {
     display: inline-flex;
-    margin-bottom: 14px;
-    padding: 8px 14px;
+    margin-bottom: 10px;
+    padding: 6px 12px;
     border-radius: 999px;
     background: rgba(66, 185, 131, 0.12);
     color: #2c8c6d;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 700;
-}
-
-.advantage-item {
-    background: #ffffff;
-    border-radius: 28px;
-    padding: 42px 28px 32px;
-    box-shadow: 0 20px 60px rgba(17, 50, 96, 0.08);
-    border: 1px solid rgba(66, 185, 131, 0.12);
-    position: relative;
 }
 
 .card-title {
     font-size: 20px;
     color: #1a202c;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     font-weight: 600;
-    line-height: 1.4;
+}
+
+.card-location {
+    font-size: 13px;
+    color: #2c8c6d;
+    margin-bottom: 8px;
 }
 
 .card-desc {
     font-size: 15px;
     color: #718096;
-    margin-bottom: 18px;
     line-height: 1.6;
-}
-
-.card-price {
-    color: #42b983;
-    font-weight: 700;
-    font-size: 18px;
-    position: relative;
-}
-
-.card-price::before {
-    content: '¥';
-    font-size: 14px;
-    margin-right: 2px;
-}
-
-.advantage-section {
-    padding: 100px 0;
-    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-    margin: 60px 0;
-    position: relative;
-    overflow: hidden;
-}
-
-.advantage-section::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: radial-gradient(circle at 20% 80%, rgba(66, 185, 131, 0.05) 0%, transparent 50%),
-        radial-gradient(circle at 80% 20%, rgba(102, 126, 234, 0.05) 0%, transparent 50%);
 }
 
 .advantage-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 40px;
-    margin-top: 60px;
+    gap: 30px;
     text-align: center;
-    max-width: 1400px;
-    margin-left: auto;
-    margin-right: auto;
-    position: relative;
-    z-index: 1;
+}
+
+.advantage-item {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 32px 24px;
+    box-shadow: 0 10px 32px rgba(17, 50, 96, 0.08);
 }
 
 .advantage-icon {
-    width: 80px;
-    height: 80px;
-    display: inline-flex;
+    width: 62px;
+    height: 62px;
+    margin: 0 auto 16px;
+    display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 20px;
+    border-radius: 16px;
     background: linear-gradient(135deg, #42b983, #359469);
     color: #fff;
-    font-size: 32px;
-    margin-bottom: 24px;
-    box-shadow: 0 8px 24px rgba(66, 185, 131, 0.3);
-    transition: all 0.3s ease;
-    position: relative;
-}
-
-.advantage-icon::before {
-    content: '';
-    position: absolute;
-    inset: -2px;
-    border-radius: 22px;
-    background: linear-gradient(135deg, #42b983, #667eea);
-    z-index: -1;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.advantage-icon:hover {
-    transform: scale(1.1) rotate(5deg);
-    box-shadow: 0 12px 32px rgba(66, 185, 131, 0.4);
-}
-
-.advantage-icon:hover::before {
-    opacity: 1;
+    font-weight: 700;
 }
 
 .advantage-title {
-    font-size: 22px;
-    color: #1a202c;
-    margin-bottom: 16px;
-    font-weight: 600;
+    font-size: 20px;
+    margin-bottom: 10px;
 }
 
 .advantage-desc {
-    font-size: 16px;
+    font-size: 15px;
     color: #4a5568;
     line-height: 1.7;
-    max-width: 300px;
-    margin: 0 auto;
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes slideInLeft {
-    from {
-        opacity: 0;
-        transform: translateX(-50px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-@keyframes slideInRight {
-    from {
-        opacity: 0;
-        transform: translateX(50px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
 }
 
 @media (max-width: 768px) {
     .video-section {
-        height: 480px;
+        min-height: 540px;
+    }
+
+    .video-overlay {
+        padding: 72px 18px 42px;
     }
 
     .video-overlay h1 {
-        font-size: 36px;
-        margin-bottom: 20px;
+        font-size: clamp(2.1rem, 10vw, 2.8rem);
     }
 
     .video-overlay p {
-        font-size: 18px;
-        margin-bottom: 32px;
+        font-size: 0.95rem;
     }
 
     .search-box {
-        width: 90%;
-        flex-direction: column;
+        padding: 8px;
+        gap: 8px;
     }
 
     .search-input {
-        border-radius: 50px 50px 0 0;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        padding: 13px 16px;
+        font-size: 15px;
     }
 
     .search-btn {
-        border-radius: 0 0 50px 50px;
-    }
-
-    .category-section {
-        padding: 40px 20px;
-        margin: 20px 0;
-        border-radius: 16px;
-    }
-
-    .section-title {
-        font-size: 28px;
-        margin-bottom: 32px;
-    }
-
-    .category-tags {
-        gap: 12px;
-    }
-
-    .tag {
-        padding: 10px 20px;
-        font-size: 14px;
-    }
-
-    .destination-section {
-        padding: 60px 20px;
-    }
-
-    .destination-grid {
-        grid-template-columns: 1fr;
-        gap: 24px;
-        margin-top: 40px;
-    }
-
-    .destination-card {
-        max-width: 100%;
-    }
-
-    .advantage-section {
-        padding: 60px 20px;
-        margin: 40px 0;
-    }
-
-    .advantage-grid {
-        grid-template-columns: 1fr;
-        gap: 32px;
-        margin-top: 40px;
-    }
-
-    .advantage-icon {
-        width: 70px;
-        height: 70px;
-        font-size: 28px;
-    }
-
-    .advantage-title {
-        font-size: 20px;
-    }
-
-    .advantage-desc {
-        font-size: 15px;
-    }
-}
-
-@media (max-width: 480px) {
-    .video-overlay h1 {
-        font-size: 28px;
-    }
-
-    .video-overlay p {
+        min-width: 96px;
+        padding: 12px 18px;
         font-size: 16px;
     }
 
-    .search-input,
-    .search-btn {
-        padding: 16px 20px;
-        font-size: 15px;
-    }
-
-    .section-title {
-        font-size: 24px;
-    }
-
-    .tag {
-        padding: 8px 16px;
-        font-size: 13px;
-    }
-
-    .card-info {
-        padding: 20px;
-    }
-
-    .card-title {
-        font-size: 18px;
-    }
-
-    .card-desc {
-        font-size: 14px;
+    .destination-grid,
+    .advantage-grid {
+        grid-template-columns: 1fr;
     }
 }
 </style>
